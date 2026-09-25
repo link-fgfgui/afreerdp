@@ -80,10 +80,10 @@ jobs:
           RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
           RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
           RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
-          COMPILE_API=36
-          TARGET_API=36
+          COMPILE_API=37
+          TARGET_API=37
           MIN_API=29
-          TOOLS_VERSION=36.0.0
+          TOOLS_VERSION=37.0.0
           NDK_VERSION=$NDK_VER
           CMAKE_VERSION=$CMAKE_VER
           SPLIT_ENABLED=true
