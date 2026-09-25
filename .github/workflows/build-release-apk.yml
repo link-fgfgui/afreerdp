@@ -38,10 +38,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Setup Android SDK and NDK
+      - name: Delete old Android SDK cmdline-tools
+        run: |
+          rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'cmdline-tools;latest platform-tools platforms;android-37 build-tools;37.0.0 cmake;3.31.6 ndk;28.0.12674087'
+          packages: 'cmdline-tools;latest platform-tools'
 
       - name: Accept Android SDK licenses
         run: |
@@ -53,17 +57,35 @@ jobs:
 
       - name: Prepare release.properties
         run: |
+          # Detect or install NDK
+          NDK_VER=$(ls -1 "$ANDROID_HOME/ndk" 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$NDK_VER" ]; then
+            echo "Installing NDK 28..."
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.0.12674087"
+            NDK_VER="28.0.12674087"
+          fi
+          echo "Using NDK: $NDK_VER"
+
+          # Detect or install CMake
+          CMAKE_VER=$(ls -1 "$ANDROID_HOME/cmake" 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$CMAKE_VER" ]; then
+            echo "Installing CMake 3.22.1..."
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "cmake;3.22.1"
+            CMAKE_VER="3.22.1"
+          fi
+          echo "Using CMake: $CMAKE_VER"
+
           cat <<EOF > client/Android/Studio/release.properties
           RELEASE_STORE_FILE=release.jks
           RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
           RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
           RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
-          COMPILE_API=37
-          TARGET_API=37
+          COMPILE_API=36
+          TARGET_API=36
           MIN_API=29
-          TOOLS_VERSION=37.0.0
-          NDK_VERSION=28.0.12674087
-          CMAKE_VERSION=3.31.6
+          TOOLS_VERSION=36.0.0
+          NDK_VERSION=$NDK_VER
+          CMAKE_VERSION=$CMAKE_VER
           SPLIT_ENABLED=true
           BUILD_UNIVERSAL=true
           SPLIT_ARCHITECTURES=${{ inputs.abi_filters || 'arm64-v8a;x86_64' }}
