@@ -3,3 +3,6 @@
 build
 checker
 abi-checker
+*.jks
+*.keystore
+release.properties

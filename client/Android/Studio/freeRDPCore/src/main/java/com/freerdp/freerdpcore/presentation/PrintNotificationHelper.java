@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class PrintNotificationHelper
 {
 	private static final String CHANNEL_ID = "rdp_print";
-	private static final String AUTHORITY = "com.freerdp.afreerdp.fileprovider";
 	private static final AtomicInteger notifId = new AtomicInteger(1000);
 
 	public static void ensureChannel(Context ctx)
@@ -47,7 +46,7 @@ public class PrintNotificationHelper
 	{
 		ensureChannel(ctx);
 
-		Uri uri = FileProvider.getUriForFile(ctx, AUTHORITY, pdfFile);
+		Uri uri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", pdfFile);
 
 		PendingIntent openIntent = PendingIntent.getActivity(
 		    ctx, notifId.get(),

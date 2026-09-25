@@ -1,0 +1,95 @@
+name: Build & Upload Signed aFreeRDP Release APK
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      abi_filters:
+        description: 'Target ABIs (separated by semicolon)'
+        required: false
+        default: 'arm64-v8a;x86_64'
+
+jobs:
+  build-afreerdp:
+    name: Build & Sign aFreeRDP Release APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config nasm ninja-build
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Android SDK and NDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'cmdline-tools;latest platform-tools platforms;android-37 build-tools;37.0.0 cmake;3.31.6 ndk;28.0.12674087'
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > client/Android/Studio/release.jks
+
+      - name: Prepare release.properties
+        run: |
+          cat <<EOF > client/Android/Studio/release.properties
+          RELEASE_STORE_FILE=release.jks
+          RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}
+          RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
+          RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}
+          COMPILE_API=37
+          TARGET_API=37
+          MIN_API=29
+          TOOLS_VERSION=37.0.0
+          NDK_VERSION=28.0.12674087
+          CMAKE_VERSION=3.31.6
+          SPLIT_ENABLED=true
+          BUILD_UNIVERSAL=true
+          SPLIT_ARCHITECTURES=${{ inputs.abi_filters || 'arm64-v8a;x86_64' }}
+          ABI_FILTERS=${{ inputs.abi_filters || 'arm64-v8a;x86_64' }}
+          APPLICATION_ID=com.freerdp.afreerdp.custom
+          EOF
+          cat client/Android/Studio/release.properties
+
+      - name: Build aFreeRDP Release APK
+        run: |
+          cd client/Android/Studio
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify Signed APKs
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          echo "Using apksigner at: $APKSIGNER"
+          for apk in $(find client/Android/Studio/aFreeRDP/build/outputs/apk/release -name "*.apk"); do
+            echo "----------------------------------------"
+            echo "Verifying APK: $apk"
+            "$APKSIGNER" verify --verbose "$apk"
+          done
+
+      - name: Upload Signed aFreeRDP Release APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: aFreeRDP-release-signed
+          path: client/Android/Studio/aFreeRDP/build/outputs/apk/release/*.apk
+          if-no-files-found: error
